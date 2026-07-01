@@ -1195,7 +1195,7 @@ function render() {
   el.gaugeFill.style.width = pct + "%";
   el.gauge.classList.toggle("hot", state.going48);
 
-  const canAct = state.phase === "play" && !state.busy && !state.over;
+  const canAct = state.phase === "play" && !state.busy && !state.over && !(curP() && curP().ai);
   el.rollBtn.disabled = !canAct || (state.shotFired && !state.going48);
   el.holdBtn.disabled = !canAct || state.turnTotal === 0 || state.going48;
   el.goBtn.classList.toggle("show", state.shotFired && !state.going48 && !state.over);
@@ -1214,7 +1214,9 @@ function passTurn() {
   state.busy = false;
   const _bg = document.getElementById("bubbleGame"); if (_bg) _bg.classList.add("hide");
   render();
-  setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
+  if (curP().ai) setMessage("<b>" + escapeHtml(curP().name) + "</b> steps up to the bar…");
+  else setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
+  scheduleAI(950);
 }
 
 async function doRoll() {
@@ -1295,6 +1297,65 @@ function doGo48() {
 }
 
 /* ============================================================
+   AI OPPONENT — Play on This Phone = You vs the house
+   ============================================================ */
+const AI_NAMES = ["Roxy","Ginger","Vixen","Lola","Scarlett","Dallas","Trixie","Bambi",
+  "Jade","Coco","Sadie","Gigi","Pearl","Honey","Roxanne","Mercy","Cherry","Nova"];
+let _aiIdx = Math.floor(Math.random() * AI_NAMES.length);
+let vsAI = false;
+let hostessName = "Ruby";
+let _aiTimer = 0;
+function pickAIName() {
+  _aiIdx = (_aiIdx + 1 + Math.floor(Math.random() * 3)) % AI_NAMES.length;
+  return AI_NAMES[_aiIdx];
+}
+function startAIGame() {
+  clearTimeout(_aiTimer);
+  clearConfetti(el.winOverlay);
+  el.winOverlay.classList.remove("show");
+  vsAI = true;
+  const aiName = pickAIName();
+  hostessName = aiName;
+  state.players = [{ name: "You", score: 0 }, { name: aiName, score: 0, ai: true }];
+  state.phase = "play"; state.cur = 0; state.turnTotal = 0; state.busy = false;
+  state.over = false; state.shotFired = false; state.going48 = false;
+  show("game");
+  drawDie(1); buildRail(); render();
+  setMessage("<b>You</b> vs <b>" + escapeHtml(aiName) + "</b> — you're up. Roll!");
+}
+function isAITurn() {
+  return vsAI && !state.over && state.phase === "play" &&
+    state.players[state.cur] && state.players[state.cur].ai;
+}
+function scheduleAI(delay) {
+  clearTimeout(_aiTimer);
+  if (!isAITurn()) return;
+  _aiTimer = setTimeout(aiAct, delay || 800);
+}
+async function aiAct() {
+  if (!isAITurn()) return;
+  if (state.busy) { scheduleAI(400); return; }
+  const me = curP();
+  const opp = state.players[(state.cur + 1) % state.players.length];
+  const behind = opp.score - me.score;
+  if (state.shotFired && !state.going48) {
+    if (me.score + state.turnTotal >= WIN_SCORE) { doHold(); return; }
+    const goChance = behind >= 0 ? 0.8 : 0.55;
+    if (Math.random() < goChance) { doGo48(); scheduleAI(750); }
+    else { doHold(); }
+    return;
+  }
+  if (!state.going48 && state.turnTotal > 0 && me.score + state.turnTotal >= WIN_SCORE) { doHold(); return; }
+  let holdAt = 27 + Math.floor(Math.random() * 6);
+  if (behind > 15) holdAt += 8;
+  if (behind > 35) holdAt += 10;
+  if (state.going48) { await doRoll(); scheduleAI(650); return; }
+  if (state.turnTotal >= holdAt) { doHold(); return; }
+  await doRoll();
+  scheduleAI(650);
+}
+
+/* ============================================================
    9) WIN / RESET (pass-and-play)
    ============================================================ */
 function endGame(winnerIdx) {
@@ -1347,6 +1408,7 @@ function playAgainSamePlayers() {
   setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
 }
 function backToHome() {
+  vsAI = false; hostessName = "Ruby"; clearTimeout(_aiTimer);
   clearConfetti(el.winOverlay);
   el.winOverlay.classList.remove("show");
   state.phase = "home";
@@ -1392,6 +1454,7 @@ function loadName() {
 }
 
 async function goOnline() {
+  vsAI = false; hostessName = "Ruby"; clearTimeout(_aiTimer);
   ensureAudio();
   el.onlineErr.textContent = "";
   el.onlineName.value = loadName();
@@ -1825,7 +1888,7 @@ el.btnSoundOff.addEventListener("click", () => {
   soundOn = false; _audioUnlocked = true; updateSoundUI();
   show("home");
 });
-el.btnLocal.addEventListener("click", () => { ensureAudio(); state.phase = "setup"; show("setup"); });
+el.btnLocal.addEventListener("click", () => { ensureAudio(); startAIGame(); });
 el.btnOnline.addEventListener("click", goOnline);
 
 // Setup (pass-and-play)
@@ -1904,6 +1967,7 @@ el.rulesOverlay.addEventListener("click", (e) => { if (e.target === el.rulesOver
 
 el.playAgainBtn.addEventListener("click", () => {
   if (winMode === "online") rematchOnline();
+  else if (vsAI) startAIGame();
   else playAgainSamePlayers();
 });
 el.winNewBtn.addEventListener("click", () => {
@@ -2082,11 +2146,11 @@ function armIntro() {
 }
 function react(kind) {
   switch (kind) {
-    case "bust":    Char.play("mock");  Char.say("Ha — drink up, sugar.", "Ruby"); break;
-    case "shot":    Char.play("tempt"); Char.say("Twenty-four… go for forty-eight?", "Ruby"); break;
-    case "beerwin": Char.play("cheer"); Char.say("Forty-eight! Somebody's chugging!", "Ruby"); break;
-    case "six":     Char.play("wink");  Char.say("A six — next one drinks!", "Ruby"); break;
-    case "bank":    Char.play("wink");  Char.say("Smart. Bank it, honey.", "Ruby"); break;
+    case "bust":    Char.play("mock");  Char.say("Ha — drink up, sugar.", hostessName); break;
+    case "shot":    Char.play("tempt"); Char.say("Twenty-four… go for forty-eight?", hostessName); break;
+    case "beerwin": Char.play("cheer"); Char.say("Forty-eight! Somebody's chugging!", hostessName); break;
+    case "six":     Char.play("wink");  Char.say("A six — next one drinks!", hostessName); break;
+    case "bank":    Char.play("wink");  Char.say("Smart. Bank it, honey.", hostessName); break;
   }
   playVoice(kind);
 }
