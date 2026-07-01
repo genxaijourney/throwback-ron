@@ -606,6 +606,33 @@
   @media(max-width:480px){
     .stage{height:186px;} .stage .char{height:186px;} .bubble{max-width:64%;}
   }
+  /* sound toggle moved onto the character stage (bottom-right) */
+  .mute-btn{display:none !important;}
+  .stage-mute{position:absolute;right:8px;bottom:30px;z-index:6;width:42px;height:42px;
+    border-radius:50%;border:1px solid #3a2c1c;background:rgba(18,13,8,.74);color:var(--brass-bri);
+    font-size:1.1rem;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;
+    justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);backdrop-filter:blur(2px);}
+  .stage-mute:active{transform:scale(.9);}
+  .home-stage .stage-mute{bottom:26px;}
+  /* ---- mobile fit: die + controls stay above the fold ---- */
+  @media(max-width:520px){
+    body{padding:10px;}
+    .card{padding:16px 13px 18px;border-radius:16px;}
+    .titlebar{margin:0 0 8px;} .titlebar h1 .big{font-size:1.95rem;} .titlebar .tagline{font-size:.66rem;letter-spacing:.18em;}
+    .corner{height:34px;min-width:34px;}
+    .stage{height:168px;margin:2px 0 10px;} .stage .char{height:168px;}
+    .home-stage{height:188px;margin:0 0 12px;} .home-stage .char{height:188px;}
+    .win-stage{height:170px;} .win-stage .char{height:170px;}
+    .bubble{max-width:62%;padding:9px 11px;} .bubble .say{font-size:.9rem;}
+    .rail{margin:4px 0 10px;gap:6px;} .chip{min-width:74px;padding:7px 6px;} .chip .sc{font-size:1.55rem;} .chip .nm{font-size:.66rem;}
+    .die-stage{height:92px;margin:2px 0 8px;} .die{width:78px;height:78px;padding:12px;} .die .pip{width:12px;height:12px;}
+    .tab-wrap{margin:0 0 8px;} .tab-head .val{font-size:1.5rem;} .gauge{height:22px;}
+    .message{min-height:1.9em;font-size:.96rem;margin-bottom:8px;}
+    .controls{flex-direction:row;gap:8px;} .controls .btn{padding:13px 6px;font-size:.9rem;}
+    .footer-row{margin-top:10px;gap:10px;} .ghost{padding:8px 12px;font-size:.74rem;}
+    .stage-mute{width:38px;height:38px;bottom:26px;font-size:1rem;}
+    .legend{padding:12px 13px;} .legend li{font-size:.86rem;}
+  }
 </style>
 </head>
 <body>
@@ -620,7 +647,7 @@
 
     <!-- ===================== HOME ===================== -->
     <section id="home" class="home">
-      <div class="home-stage"><canvas class="char" id="charHome" width="320" height="180" aria-hidden="true"></canvas><div class="counter"></div></div>
+      <div class="home-stage"><canvas class="char" id="charHome" width="320" height="180" aria-hidden="true"></canvas><button class="stage-mute" aria-label="Toggle sound">🔊</button><div class="counter"></div></div>
       <div class="q">How do you want to play?</div>
       <div class="stack">
         <button id="btnLocal" class="btn btn-start">📱 Play on This Phone</button>
@@ -697,6 +724,7 @@
         <div class="bottles"><span class="bottle" style="height:60%"></span><span class="bottle" style="height:82%"></span><span class="bottle" style="height:54%"></span><span class="bottle" style="height:90%"></span><span class="bottle" style="height:68%"></span><span class="bottle" style="height:78%"></span></div>
         <div class="bubble hide" id="bubbleGame"><div class="who">Ruby</div><div class="say"></div></div>
         <canvas class="char" id="charGame" width="320" height="180" aria-hidden="true"></canvas>
+        <button class="stage-mute" aria-label="Toggle sound">🔊</button>
         <div class="counter"></div>
       </div>
       <div id="rail" class="rail" aria-label="Players and scores"></div>
@@ -744,6 +772,7 @@
         <div class="bottles"><span class="bottle" style="height:60%"></span><span class="bottle" style="height:82%"></span><span class="bottle" style="height:54%"></span><span class="bottle" style="height:90%"></span><span class="bottle" style="height:68%"></span><span class="bottle" style="height:78%"></span></div>
         <div class="bubble hide" id="bubbleOnline"><div class="who">Ruby</div><div class="say"></div></div>
         <canvas class="char" id="charOnline" width="320" height="180" aria-hidden="true"></canvas>
+        <button class="stage-mute" aria-label="Toggle sound">🔊</button>
         <div class="counter"></div>
       </div>
       <div id="railOnline" class="rail" aria-label="Players and scores"></div>
@@ -1807,13 +1836,20 @@ el.winNewBtn.addEventListener("click", () => {
   }
 });
 
-el.muteBtn.addEventListener("click", () => {
+function updateSoundUI() {
+  const t = soundOn ? "🔊" : "🔇";
+  if (el.muteBtn) el.muteBtn.textContent = t;
+  document.querySelectorAll(".stage-mute").forEach(b => { b.textContent = t; b.setAttribute("aria-label", soundOn ? "Mute sound" : "Unmute sound"); });
+}
+function toggleSound() {
   soundOn = !soundOn;
   if (!soundOn) stopVoice();
   ensureAudio();
-  el.muteBtn.textContent = soundOn ? "🔊" : "🔇";
-  el.muteBtn.setAttribute("aria-label", soundOn ? "Mute sound" : "Unmute sound");
-});
+  updateSoundUI();
+}
+if (el.muteBtn) el.muteBtn.addEventListener("click", toggleSound);
+document.querySelectorAll(".stage-mute").forEach(b => b.addEventListener("click", (e) => { e.stopPropagation(); toggleSound(); }));
+updateSoundUI();
 
 document.addEventListener("keydown", (e) => {
   if (state.phase !== "play" || state.over) return;
@@ -1941,6 +1977,20 @@ function playVoice(kind) {
   a.volume = 0.92; _voice = a;
   const pr = a.play(); if (pr && pr.catch) pr.catch(() => {});
 }
+AUDIO.intro = AUDIO.win;
+let _introArmed = false;
+function armIntro() {
+  if (_introArmed) return; _introArmed = true;
+  const fire = () => {
+    if (_lastScreen === "home" && soundOn) playVoice("intro");
+    window.removeEventListener("pointerdown", fire, true);
+    window.removeEventListener("touchstart", fire, true);
+    window.removeEventListener("keydown", fire, true);
+  };
+  window.addEventListener("pointerdown", fire, true);
+  window.addEventListener("touchstart", fire, true);
+  window.addEventListener("keydown", fire, true);
+}
 function react(kind) {
   switch (kind) {
     case "bust":    Char.play("mock");  Char.say("Ha — drink up, sugar.", "Ruby"); break;
@@ -1979,6 +2029,7 @@ buildCountRow();
 buildNameFields();
 drawDie(1);
 show("home");
+armIntro();
 </script>
 </body>
 </html>
