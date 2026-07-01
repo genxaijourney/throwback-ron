@@ -633,6 +633,14 @@
     .stage-mute{width:38px;height:38px;bottom:26px;font-size:1rem;}
     .legend{padding:12px 13px;} .legend li{font-size:.86rem;}
   }
+  /* roll row: die slides under the active player, Ruby's comment beside it */
+  .rollrow{position:relative;height:118px;margin:6px 0 12px;}
+  .die-holder{position:absolute;bottom:12px;left:calc(50% - 46px);transition:left .35s cubic-bezier(.3,1,.4,1);}
+  .rollrow .bubble{position:absolute;top:50%;transform:translateY(-50%);margin:0;max-width:52%;left:auto;right:auto;}
+  .rollrow .bubble::after{display:none;}
+  .rollrow .bubble.point-left::after{display:block;content:"";position:absolute;left:-7px;top:50%;margin-top:-7px;width:0;height:0;border:7px solid transparent;border-right-color:#1f2731;background:none;}
+  .rollrow .bubble.point-right::after{display:block;content:"";position:absolute;right:-7px;top:50%;margin-top:-7px;width:0;height:0;border:7px solid transparent;border-left-color:#1f2731;background:none;}
+  @media(max-width:520px){ .rollrow{height:100px;} .die-holder{bottom:10px;} .rollrow .bubble{max-width:50%;} .rollrow .bubble .say{font-size:.86rem;} }
 </style>
 </head>
 <body>
@@ -722,17 +730,19 @@
     <section id="game" class="game">
       <div class="stage">
         <div class="bottles"><span class="bottle" style="height:60%"></span><span class="bottle" style="height:82%"></span><span class="bottle" style="height:54%"></span><span class="bottle" style="height:90%"></span><span class="bottle" style="height:68%"></span><span class="bottle" style="height:78%"></span></div>
-        <div class="bubble hide" id="bubbleGame"><div class="who">Ruby</div><div class="say"></div></div>
         <canvas class="char" id="charGame" width="320" height="180" aria-hidden="true"></canvas>
         <button class="stage-mute" aria-label="Toggle sound">🔊</button>
         <div class="counter"></div>
       </div>
       <div id="rail" class="rail" aria-label="Players and scores"></div>
 
-      <div class="die-stage">
-        <div id="die" class="die" aria-label="Die showing 1" role="img">
-          <span class="pip p5"></span>
+      <div class="rollrow" id="rollRowGame">
+        <div class="die-holder" id="dieHolderGame">
+          <div id="die" class="die" aria-label="Die showing 1" role="img">
+            <span class="pip p5"></span>
+          </div>
         </div>
+        <div class="bubble hide" id="bubbleGame"><div class="who">Ruby</div><div class="say"></div></div>
       </div>
 
       <div class="tab-wrap">
@@ -770,17 +780,19 @@
     <section id="gameOnline" class="game" aria-label="Online game">
       <div class="stage">
         <div class="bottles"><span class="bottle" style="height:60%"></span><span class="bottle" style="height:82%"></span><span class="bottle" style="height:54%"></span><span class="bottle" style="height:90%"></span><span class="bottle" style="height:68%"></span><span class="bottle" style="height:78%"></span></div>
-        <div class="bubble hide" id="bubbleOnline"><div class="who">Ruby</div><div class="say"></div></div>
         <canvas class="char" id="charOnline" width="320" height="180" aria-hidden="true"></canvas>
         <button class="stage-mute" aria-label="Toggle sound">🔊</button>
         <div class="counter"></div>
       </div>
       <div id="railOnline" class="rail" aria-label="Players and scores"></div>
 
-      <div class="die-stage">
-        <div id="dieOnline" class="die" aria-label="Die showing 1" role="img">
-          <span class="pip p5"></span>
+      <div class="rollrow" id="rollRowOnline">
+        <div class="die-holder" id="dieHolderOnline">
+          <div id="dieOnline" class="die" aria-label="Die showing 1" role="img">
+            <span class="pip p5"></span>
+          </div>
         </div>
+        <div class="bubble hide" id="bubbleOnline"><div class="who">Ruby</div><div class="say"></div></div>
       </div>
 
       <div class="tab-wrap">
@@ -1165,6 +1177,7 @@ function render() {
   el.holdBtn.disabled = !canAct || state.turnTotal === 0 || state.going48;
   el.goBtn.classList.toggle("show", state.shotFired && !state.going48 && !state.over);
   el.goBtn.disabled = !canAct;
+  layoutRoll(document.getElementById("rollRowGame"), document.getElementById("dieHolderGame"), document.getElementById("bubbleGame"), el.rail.querySelector(".chip.active"));
 }
 
 /* ============================================================
@@ -1176,6 +1189,7 @@ function passTurn() {
   state.going48 = false;
   state.cur = nextIdx();
   state.busy = false;
+  const _bg = document.getElementById("bubbleGame"); if (_bg) _bg.classList.add("hide");
   render();
   setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
 }
@@ -1550,6 +1564,7 @@ function renderOnlineGame(room) {
   // sound once per new event
   const seq = room.lastEvent ? (room.lastEvent.seq || 0) : 0;
   if (seq !== lastSeenSeq) { lastSeenSeq = seq; onlineSound(lastType); reactOnline(lastType); }
+  if (lastType === "roll" || lastType === "start") { const _bo = document.getElementById("bubbleOnline"); if (_bo) _bo.classList.add("hide"); }
 
   if (room.status === "over") {
     el.rollBtnO.disabled = true; el.holdBtnO.disabled = true;
@@ -1582,6 +1597,7 @@ function renderOnlineGame(room) {
   el.holdBtnO.disabled = !canAct || (room.turnTotal || 0) === 0 || room.going48;
   el.goBtnO.classList.toggle("show", room.status === "playing" && room.shotFired && !room.going48 && myTurn);
   el.goBtnO.disabled = !canAct;
+  layoutRoll(document.getElementById("rollRowOnline"), document.getElementById("dieHolderOnline"), document.getElementById("bubbleOnline"), el.railOnline.querySelector(".chip.active"));
   el.onlineTurn.textContent = myTurn ? "🎲 Your turn — roll!" : ("⏳ Waiting on " + nameOf(room, curUid) + "…");
   show("gameOnline");
 }
@@ -2021,6 +2037,39 @@ function screenChanged(id) {
   _lastScreen = id;
   if (id === "home" || id === "game" || id === "gameOnline") charMountScreen(id);
 }
+function layoutRoll(row, holder, bubble, activeChip) {
+  if (!row || !holder) return;
+  const rw = row.clientWidth || 0;
+  if (!rw) { requestAnimationFrame(() => layoutRoll(row, holder, bubble, activeChip)); return; }
+  const dieW = holder.offsetWidth || 92;
+  let centerX = rw / 2;
+  if (activeChip) {
+    const cr = activeChip.getBoundingClientRect(), rr = row.getBoundingClientRect();
+    centerX = (cr.left + cr.right) / 2 - rr.left;
+  }
+  const dieLeft = Math.max(4, Math.min(rw - dieW - 4, centerX - dieW / 2));
+  holder.style.left = dieLeft + "px";
+  if (bubble) {
+    const gap = 12;
+    if (centerX < rw / 2) {
+      bubble.style.left = (dieLeft + dieW + gap) + "px"; bubble.style.right = "auto";
+      bubble.style.maxWidth = Math.max(90, rw - (dieLeft + dieW + gap) - 6) + "px";
+      bubble.classList.add("point-left"); bubble.classList.remove("point-right");
+    } else {
+      const rp = rw - dieLeft + gap;
+      bubble.style.right = rp + "px"; bubble.style.left = "auto";
+      bubble.style.maxWidth = Math.max(90, rw - rp - 6) + "px";
+      bubble.classList.add("point-right"); bubble.classList.remove("point-left");
+    }
+  }
+}
+function relayoutActive() {
+  if (el.game && getComputedStyle(el.game).display !== "none")
+    layoutRoll(document.getElementById("rollRowGame"), document.getElementById("dieHolderGame"), document.getElementById("bubbleGame"), el.rail.querySelector(".chip.active"));
+  if (el.gameOnline && getComputedStyle(el.gameOnline).display !== "none")
+    layoutRoll(document.getElementById("rollRowOnline"), document.getElementById("dieHolderOnline"), document.getElementById("bubbleOnline"), el.railOnline.querySelector(".chip.active"));
+}
+window.addEventListener("resize", relayoutActive);
 
 /* ============================================================
    13) BOOT
