@@ -607,21 +607,46 @@
       </div>
     </section>
 
-    <!-- ===================== GAME ONLINE (Phase 1 holding board) ===================== -->
+    <!-- ===================== GAME ONLINE (live synced board) ===================== -->
     <section id="gameOnline" class="game" aria-label="Online game">
       <div id="railOnline" class="rail" aria-label="Players and scores"></div>
 
       <div class="die-stage">
-        <div class="die" aria-label="Die showing 5" role="img">
-          <span class="pip p1"></span><span class="pip p3"></span><span class="pip p5"></span>
-          <span class="pip p7"></span><span class="pip p9"></span>
+        <div id="dieOnline" class="die" aria-label="Die showing 1" role="img">
+          <span class="pip p5"></span>
+        </div>
+      </div>
+
+      <div class="tab-wrap">
+        <div class="tab-head">
+          <span class="lbl">This turn</span>
+          <span id="tabValOnline" class="val">0</span>
+        </div>
+        <div id="gaugeOnline" class="gauge" aria-hidden="true">
+          <div id="gaugeFillOnline" class="fill"></div>
+          <div class="mark shot"></div>
+          <div class="mark beer"></div>
+        </div>
+        <div class="tab-ticks">
+          <span>0</span>
+          <span class="shot-t">24 · Shot</span>
+          <span class="beer-t">48 · Beer</span>
         </div>
       </div>
 
       <div id="onlineMsg" class="message" aria-live="polite">Game on!</div>
-      <p class="hint">Live turn-by-turn play arrives in the next update. For now, everyone's synced in the same room.</p>
+      <div id="onlineTurn" class="q" style="margin:0 0 12px;" aria-live="polite"></div>
 
-      <div class="footer-row"><button id="onlineLeave" class="ghost">← Leave Room</button></div>
+      <div class="controls">
+        <button id="rollBtnO" class="btn btn-roll">🎲 Roll</button>
+        <button id="goBtnO" class="btn btn-go">🍺 Go for 48</button>
+        <button id="holdBtnO" class="btn btn-hold">✋ Hold</button>
+      </div>
+
+      <div class="footer-row">
+        <button id="rulesBtn3" class="ghost">📜 Rules</button>
+        <button id="onlineLeave" class="ghost">← Leave Room</button>
+      </div>
     </section>
   </main>
 
@@ -759,9 +784,18 @@ const el = {
   holdBtn:    document.getElementById("holdBtn"),
   newGameBtn: document.getElementById("newGameBtn"),
 
-  // game online (holding)
+  // game online (live board)
   railOnline: document.getElementById("railOnline"),
+  dieOnline:  document.getElementById("dieOnline"),
+  tabValOnline: document.getElementById("tabValOnline"),
+  gaugeOnline:  document.getElementById("gaugeOnline"),
+  gaugeFillOnline: document.getElementById("gaugeFillOnline"),
   onlineMsg:  document.getElementById("onlineMsg"),
+  onlineTurn: document.getElementById("onlineTurn"),
+  rollBtnO:   document.getElementById("rollBtnO"),
+  goBtnO:     document.getElementById("goBtnO"),
+  holdBtnO:   document.getElementById("holdBtnO"),
+  rulesBtn3:  document.getElementById("rulesBtn3"),
   onlineLeave:document.getElementById("onlineLeave"),
 
   // shared
@@ -1062,6 +1096,9 @@ function endGame(winnerIdx) {
   showWin();
 }
 function showWin() {
+  winMode = "local";
+  el.playAgainBtn.textContent = "Play Again";
+  el.winNewBtn.textContent = "New Players";
   el.winOverlay.classList.add("show");
   launchConfetti(el.winOverlay);
   el.playAgainBtn.focus();
@@ -1118,6 +1155,12 @@ const NAME_KEY = "ron_name";
 let roomCode = null;
 let roomUnsub = null;
 let roomData = null;
+
+// online gameplay state
+let onlineBusy = false;      // locks input while a write is in flight
+let winMode = "local";       // which mode the win overlay is serving
+let onlineOverShown = false; // win overlay already popped for this online game
+let lastSeenSeq = -1;        // last lastEvent.seq we reacted to (for sound)
 
 function genCode() {
   let c = "";
@@ -1194,6 +1237,8 @@ function wireConnected(code) {
 
 function subscribeRoom(code) {
   roomCode = code;
+  lastSeenSeq = -1;
+  onlineOverShown = false;
   if (roomUnsub) { roomUnsub(); roomUnsub = null; }
   roomUnsub = onValue(ref(db, "rooms/" + code), (snap) => {
     if (!snap.exists()) { leaveCleanup(); show("home"); return; }
@@ -1233,27 +1278,262 @@ function renderRoom(room) {
     });
     show("lobby");
   } else {
-    // status "playing" (Phase 1 holding board) — everyone flips together
-    el.railOnline.innerHTML = "";
-    list.forEach(p => {
-      const c = document.createElement("div");
-      c.className = "chip";
-      c.innerHTML = '<div class="nm"></div><div class="sc"></div>';
-      c.querySelector(".nm").textContent = p.name || "Player";
-      c.querySelector(".sc").textContent = p.score || 0;
-      el.railOnline.appendChild(c);
-    });
-    const first = list[room.currentIdx] || list[0];
-    const firstName = first ? (first.uid === myUid ? "You go" : escapeHtml(first.name) + " goes") : "Someone goes";
-    el.onlineMsg.innerHTML = "🎲 <b>Game on!</b> " + firstName + " first.";
-    show("gameOnline");
+    // status "playing" or "over" → live synced board
+    renderOnlineGame(room);
   }
 }
 
 async function startOnlineGame() {
   if (!roomCode) return;
-  try { await update(ref(db, "rooms/" + roomCode), { status: "playing" }); }
-  catch (e) { /* rules or network */ }
+  try {
+    const snap = await get(ref(db, "rooms/" + roomCode));
+    if (!snap.exists()) return;
+    const room = snap.val();
+    const firstUid = (Array.isArray(room.turnOrder) ? room.turnOrder : [])[0];
+    const firstName = nameOf(room, firstUid);
+    await update(ref(db, "rooms/" + roomCode), {
+      status: "playing", currentIdx: 0, turnTotal: 0, shotFired: false,
+      going48: false, lastDie: 1, winner: null,
+      lastEvent: { seq: (room.lastEvent?.seq || 0) + 1, type: "start", by: firstUid, value: 0, ts: Date.now() },
+      lastMsg: "Game on! " + firstName + " goes first."
+    });
+  } catch (e) { /* rules or network */ }
+}
+
+/* ---- online turn helpers ---- */
+function nameOf(room, uid) {
+  return (room.players && room.players[uid]) ? (room.players[uid].name || "Player") : "Someone";
+}
+function turnLen(room) { return (Array.isArray(room.turnOrder) ? room.turnOrder.length : 0) || 1; }
+function curUidOf(room) {
+  const o = Array.isArray(room.turnOrder) ? room.turnOrder : [];
+  const len = turnLen(room);
+  return o[(((room.currentIdx || 0) % len) + len) % len];
+}
+function nextUidOf(room) {
+  const o = Array.isArray(room.turnOrder) ? room.turnOrder : [];
+  return o[((room.currentIdx || 0) + 1) % turnLen(room)];
+}
+function nextIdxOnline(room) { return ((room.currentIdx || 0) + 1) % turnLen(room); }
+function myTurnOnline(room) { return curUidOf(room) === myUid; }
+
+/* ---- paint a die face on any node ---- */
+function paintDie(node, value, bust) {
+  const positions = FACE_PIPS[value] || FACE_PIPS[1];
+  node.innerHTML = positions.map(p => `<span class="pip ${p}"></span>`).join("");
+  node.classList.toggle("bust", !!bust);
+  node.setAttribute("aria-label", "Die showing " + value);
+}
+
+/* ---- sound for the event everyone just received ---- */
+function onlineSound(type) {
+  if (!soundOn) return;
+  switch (type) {
+    case "roll": sfx.roll(); break;
+    case "six": sfx.six(); break;
+    case "shot": sfx.shot(); break;
+    case "bust": sfx.bust(); break;
+    case "go48": sfx.commit(); break;
+    case "bank": sfx.bank(); break;
+    case "beer_win": sfx.beerWin(); break;
+    case "beer_fail": sfx.beerFail(); break;
+    case "win": sfx.win(); break;
+    case "start": sfx.join(); break;
+  }
+}
+
+/* ============================================================
+   11b) ONLINE GAME — render + actions (writes drive all phones)
+   ============================================================ */
+function renderOnlineGame(room) {
+  const list = orderedPlayers(room);
+  const curUid = curUidOf(room);
+  const lastType = room.lastEvent ? room.lastEvent.type : "start";
+
+  // rail
+  el.railOnline.innerHTML = "";
+  list.forEach(p => {
+    const c = document.createElement("div");
+    c.className = "chip" + (p.uid === curUid && room.status !== "over" ? " active" : "");
+    c.innerHTML = '<div class="nm"></div><div class="sc"></div>';
+    c.querySelector(".nm").textContent = (p.name || "Player") + (p.uid === myUid ? " (you)" : "");
+    c.querySelector(".sc").textContent = p.score || 0;
+    el.railOnline.appendChild(c);
+  });
+
+  // die + gauge
+  paintDie(el.dieOnline, room.lastDie || 1, lastType === "bust" || lastType === "beer_fail");
+  el.tabValOnline.textContent = room.turnTotal || 0;
+  el.gaugeFillOnline.style.width = (Math.min(room.turnTotal || 0, BEER_AT) / BEER_AT * 100) + "%";
+  el.gaugeOnline.classList.toggle("hot", !!room.going48);
+
+  // message (plain text — player names are untrusted)
+  el.onlineMsg.textContent = room.lastMsg || "Game on!";
+
+  // sound once per new event
+  const seq = room.lastEvent ? (room.lastEvent.seq || 0) : 0;
+  if (seq !== lastSeenSeq) { lastSeenSeq = seq; onlineSound(lastType); }
+
+  if (room.status === "over") {
+    el.rollBtnO.disabled = true; el.holdBtnO.disabled = true;
+    el.goBtnO.disabled = true; el.goBtnO.classList.remove("show");
+    const wName = nameOf(room, room.winner);
+    el.onlineTurn.textContent = "🏆 " + wName + " wins!";
+    if (!onlineOverShown) {
+      onlineOverShown = true;
+      winMode = "online";
+      el.winName.textContent = wName;
+      el.winSub.textContent = "First to " + WIN_SCORE + ". Everybody else — drink up.";
+      el.playAgainBtn.textContent = "Rematch";
+      el.winNewBtn.textContent = "Leave Room";
+      el.winOverlay.classList.add("show");
+      launchConfetti(el.winOverlay);
+    }
+    show("gameOnline");
+    return;
+  }
+
+  onlineOverShown = false;
+  const myTurn = curUid === myUid;
+  const canAct = myTurn && room.status === "playing" && !onlineBusy;
+  el.rollBtnO.disabled = !canAct || (room.shotFired && !room.going48);
+  el.holdBtnO.disabled = !canAct || (room.turnTotal || 0) === 0 || room.going48;
+  el.goBtnO.classList.toggle("show", room.status === "playing" && room.shotFired && !room.going48 && myTurn);
+  el.goBtnO.disabled = !canAct;
+  el.onlineTurn.textContent = myTurn ? "🎲 Your turn — roll!" : ("⏳ Waiting on " + nameOf(room, curUid) + "…");
+  show("gameOnline");
+}
+
+async function doRollOnline() {
+  if (onlineBusy) return;
+  onlineBusy = true;
+  try {
+    const snap = await get(ref(db, "rooms/" + roomCode));
+    if (!snap.exists()) return;
+    const room = snap.val();
+    if (room.status !== "playing" || !myTurnOnline(room)) return;
+    if (room.shotFired && !room.going48) return; // must bank or commit at 24
+    const meName = nameOf(room, myUid);
+    const nxtName = nameOf(room, nextUidOf(room));
+    const v = rollDie();
+    const seq = (room.lastEvent?.seq || 0) + 1;
+
+    // BUST
+    if (v === 1) {
+      const beer = !!room.going48;
+      await update(ref(db, "rooms/" + roomCode), {
+        lastDie: v, turnTotal: 0, shotFired: false, going48: false,
+        currentIdx: nextIdxOnline(room),
+        lastEvent: { seq, type: beer ? "beer_fail" : "bust", by: myUid, value: v, ts: Date.now() },
+        lastMsg: beer
+          ? (meName + " busted going for 48 — chug a full beer 🍺 and lose it all! " + nxtName + "'s up.")
+          : (meName + " rolled a 1 — drink 🍺. Turn lost. " + nxtName + "'s up.")
+      });
+      return;
+    }
+
+    const newTotal = (room.turnTotal || 0) + v;
+
+    // made 48 while committed
+    if (room.going48 && newTotal >= BEER_AT) {
+      const players = room.players;
+      players[myUid].score = (players[myUid].score || 0) + newTotal;
+      const won = players[myUid].score >= WIN_SCORE;
+      await update(ref(db, "rooms/" + roomCode), {
+        lastDie: v, turnTotal: 0, shotFired: false, going48: false, players,
+        currentIdx: won ? room.currentIdx : nextIdxOnline(room),
+        status: won ? "over" : "playing", winner: won ? myUid : null,
+        lastEvent: { seq, type: won ? "win" : "beer_win", by: myUid, value: newTotal, ts: Date.now() },
+        lastMsg: won
+          ? (meName + " hits 48 and WINS! 🏆")
+          : (meName + " hit 48! " + nxtName + " CHUGS A BEER 🍺. " + meName + " banks " + newTotal + ". " + nxtName + "'s up.")
+      });
+      return;
+    }
+
+    // normal roll (maybe crosses the 24 shot line)
+    const crossedShot = !room.shotFired && newTotal >= SHOT_AT;
+    let msg = meName + " rolled a " + v + ".";
+    if (v === 6) msg = meName + " rolled a 6 — " + nxtName + " drinks! 🍺";
+    if (crossedShot) msg = meName + " hit " + newTotal + " 🥃 — " + nxtName + " takes a SHOT! Bank it, or go for 48?";
+    await update(ref(db, "rooms/" + roomCode), {
+      lastDie: v, turnTotal: newTotal, shotFired: room.shotFired || crossedShot,
+      lastEvent: { seq, type: crossedShot ? "shot" : (v === 6 ? "six" : "roll"), by: myUid, value: v, ts: Date.now() },
+      lastMsg: msg
+    });
+  } catch (e) { /* network */ }
+  finally { onlineBusy = false; }
+}
+
+async function doHoldOnline() {
+  if (onlineBusy) return;
+  onlineBusy = true;
+  try {
+    const snap = await get(ref(db, "rooms/" + roomCode));
+    if (!snap.exists()) return;
+    const room = snap.val();
+    if (room.status !== "playing" || !myTurnOnline(room)) return;
+    if ((room.turnTotal || 0) === 0 || room.going48) return;
+    const meName = nameOf(room, myUid);
+    const nxtName = nameOf(room, nextUidOf(room));
+    const banked = room.turnTotal || 0;
+    const players = room.players;
+    players[myUid].score = (players[myUid].score || 0) + banked;
+    const won = players[myUid].score >= WIN_SCORE;
+    const seq = (room.lastEvent?.seq || 0) + 1;
+    await update(ref(db, "rooms/" + roomCode), {
+      players, turnTotal: 0, shotFired: false, going48: false,
+      currentIdx: won ? room.currentIdx : nextIdxOnline(room),
+      status: won ? "over" : "playing", winner: won ? myUid : null,
+      lastEvent: { seq, type: won ? "win" : "bank", by: myUid, value: banked, ts: Date.now() },
+      lastMsg: won
+        ? (meName + " banks " + banked + " and WINS! 🏆")
+        : (meName + " banks " + banked + ". " + nxtName + "'s up.")
+    });
+  } catch (e) { /* network */ }
+  finally { onlineBusy = false; }
+}
+
+async function doGo48Online() {
+  if (onlineBusy) return;
+  onlineBusy = true;
+  try {
+    const snap = await get(ref(db, "rooms/" + roomCode));
+    if (!snap.exists()) return;
+    const room = snap.val();
+    if (room.status !== "playing" || !myTurnOnline(room)) return;
+    if (!room.shotFired || room.going48) return;
+    const meName = nameOf(room, myUid);
+    const seq = (room.lastEvent?.seq || 0) + 1;
+    await update(ref(db, "rooms/" + roomCode), {
+      going48: true,
+      lastEvent: { seq, type: "go48", by: myUid, value: room.turnTotal || 0, ts: Date.now() },
+      lastMsg: meName + " is GOING FOR 48 — no holding now. Reach 48 or chug a beer!"
+    });
+  } catch (e) { /* network */ }
+  finally { onlineBusy = false; }
+}
+
+async function rematchOnline() {
+  if (!roomCode) return;
+  try {
+    const snap = await get(ref(db, "rooms/" + roomCode));
+    if (!snap.exists()) return;
+    const room = snap.val();
+    const players = room.players || {};
+    Object.keys(players).forEach(u => { players[u].score = 0; });
+    clearConfetti(el.winOverlay);
+    el.winOverlay.classList.remove("show");
+    onlineOverShown = false;
+    const firstUid = (Array.isArray(room.turnOrder) ? room.turnOrder : [])[0];
+    const firstName = nameOf(room, firstUid);
+    await update(ref(db, "rooms/" + roomCode), {
+      players, currentIdx: 0, turnTotal: 0, shotFired: false, going48: false,
+      lastDie: 1, status: "playing", winner: null,
+      lastEvent: { seq: (room.lastEvent?.seq || 0) + 1, type: "start", by: firstUid, value: 0, ts: Date.now() },
+      lastMsg: "Rematch! " + firstName + " goes first."
+    });
+  } catch (e) { /* network */ }
 }
 
 async function leaveRoom() {
@@ -1270,6 +1550,12 @@ function leaveCleanup() {
   if (roomUnsub) { roomUnsub(); roomUnsub = null; }
   roomCode = null;
   roomData = null;
+  onlineOverShown = false;
+  lastSeenSeq = -1;
+  if (winMode === "online") {
+    clearConfetti(el.winOverlay);
+    el.winOverlay.classList.remove("show");
+  }
 }
 
 /* ============================================================
@@ -1335,6 +1621,12 @@ el.btnStart.addEventListener("click", startOnlineGame);
 el.lobbyLeave.addEventListener("click", leaveRoom);
 el.onlineLeave.addEventListener("click", leaveRoom);
 
+// Online game controls
+el.rollBtnO.addEventListener("click", doRollOnline);
+el.holdBtnO.addEventListener("click", doHoldOnline);
+el.goBtnO.addEventListener("click", doGo48Online);
+el.rulesBtn3.addEventListener("click", openRules);
+
 // Game (local)
 el.rollBtn.addEventListener("click", doRoll);
 el.holdBtn.addEventListener("click", doHold);
@@ -1347,8 +1639,19 @@ el.rulesBtn2.addEventListener("click", openRules);
 el.rulesClose.addEventListener("click", closeRules);
 el.rulesOverlay.addEventListener("click", (e) => { if (e.target === el.rulesOverlay) closeRules(); });
 
-el.playAgainBtn.addEventListener("click", playAgainSamePlayers);
-el.winNewBtn.addEventListener("click", backToHome);
+el.playAgainBtn.addEventListener("click", () => {
+  if (winMode === "online") rematchOnline();
+  else playAgainSamePlayers();
+});
+el.winNewBtn.addEventListener("click", () => {
+  if (winMode === "online") {
+    clearConfetti(el.winOverlay);
+    el.winOverlay.classList.remove("show");
+    leaveRoom();
+  } else {
+    backToHome();
+  }
+});
 
 el.muteBtn.addEventListener("click", () => {
   soundOn = !soundOn;
