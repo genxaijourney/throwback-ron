@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>🐗 PIG — Bar Rules</title>
+<title>🐗 Throwback Ron's Bar Dice</title>
 <style>
   /* ============================================================
-     PIG — BAR RULES
-     A push-your-luck dice drinking game. Pass-and-play, 2–6 players.
+     THROWBACK RON'S BAR DICE
+     A push-your-luck dice drinking game. 2–6 players.
+     Play on one phone (pass-and-play) OR online in a room.
      All visuals are CSS/SVG; all sound is Web Audio. No assets.
      ============================================================ */
 
@@ -74,16 +75,18 @@
   .titlebar { text-align: center; margin: 4px 0 16px; }
   .titlebar h1 {
     margin: 0;
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 900;
-    letter-spacing: .14em;
+    letter-spacing: .12em;
     text-transform: uppercase;
     color: var(--bone);
     text-shadow: 0 2px 0 #000, 0 0 22px rgba(224,146,47,.25);
+    line-height: 1.1;
   }
   .titlebar h1 .hog { color: var(--amber); }
+  .titlebar h1 .big { display: block; font-size: 2.5rem; letter-spacing: .1em; }
   .titlebar .tagline {
-    margin: 6px 0 0;
+    margin: 8px 0 0;
     color: var(--ash);
     font-size: .82rem;
     text-transform: uppercase;
@@ -110,9 +113,9 @@
   .rules-btn { left: 14px; }
   .mute-btn  { right: 14px; }
 
-  /* ---------- Setup screen ---------- */
-  .setup { text-align: center; }
-  .setup .q {
+  /* ---------- Screens ---------- */
+  .setup, .home, .online, .lobby { text-align: center; }
+  .q {
     font-size: .82rem; text-transform: uppercase; letter-spacing: .18em;
     color: var(--ash); font-weight: 800; margin: 10px 0 10px;
   }
@@ -199,6 +202,61 @@
     background: linear-gradient(160deg, var(--amber-bri), var(--amber));
     color: #20160a;
     box-shadow: 0 10px 24px rgba(224,146,47,.28);
+  }
+  .btn-online {
+    width: 100%;
+    background: var(--steel);
+    color: var(--bone);
+    border-color: var(--amber);
+    box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  }
+
+  /* ---------- Home / online / lobby ---------- */
+  .stack { display: grid; gap: 12px; margin: 6px 0 18px; max-width: 420px; margin-left: auto; margin-right: auto; }
+  .err { color: var(--blood); min-height: 1.2em; font-size: .85rem; font-weight: 800; margin: 2px 0 8px; }
+  .hint { color: var(--ash); font-size: .78rem; line-height: 1.4; margin: 6px auto 0; max-width: 420px; }
+
+  .code-display {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+    font-size: 3rem; font-weight: 800; letter-spacing: .34em;
+    text-indent: .34em; /* balance the trailing letter-spacing */
+    text-align: center; color: var(--amber-bri);
+    background: var(--bg); border: 1px solid var(--amber);
+    border-radius: 12px; padding: 16px 10px; margin: 0 auto 18px;
+    max-width: 320px;
+    box-shadow: inset 0 0 22px rgba(224,146,47,.15), 0 0 18px rgba(224,146,47,.12);
+  }
+  .code-input {
+    width: 100%; max-width: 320px; text-transform: uppercase;
+    letter-spacing: .3em; text-indent: .3em; text-align: center;
+    font-size: 1.9rem; font-weight: 800;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+    background: var(--bg); color: var(--bone);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  }
+  .code-input:focus { outline: none; border-color: var(--amber); }
+
+  .lobby-roster { display: grid; gap: 8px; margin: 0 auto 16px; max-width: 420px; }
+  .roster-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px 13px; text-align: left;
+  }
+  .roster-row .rdot {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #46c46a; flex: 0 0 auto;
+    box-shadow: 0 0 10px rgba(70,196,106,.6);
+  }
+  .roster-row.off .rdot { background: var(--ash); box-shadow: none; }
+  .roster-row .who {
+    font-weight: 800; letter-spacing: .03em; color: var(--bone);
+    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .roster-row.me .who { color: var(--amber-bri); }
+  .roster-row .badge {
+    font-size: .62rem; font-weight: 900; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--amber); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 8px;
   }
 
   /* ---------- Game screen ---------- */
@@ -415,9 +473,11 @@
 
   /* ---------- Responsive ---------- */
   @media (max-width: 460px) {
-    .titlebar h1 { font-size: 2rem; }
+    .titlebar h1 { font-size: 1.6rem; }
+    .titlebar h1 .big { font-size: 2rem; }
     .controls { flex-direction: column; }
     .chip .sc { font-size: 1.7rem; }
+    .code-display { font-size: 2.4rem; }
   }
   @media (prefers-reduced-motion: reduce) {
     .die.rolling, .die.bust, .gauge.hot .fill, .btn-go.show { animation: none !important; }
@@ -425,21 +485,23 @@
 </style>
 </head>
 <body>
-  <main class="card" role="application" aria-label="Pig bar-rules dice game">
+  <main class="card" role="application" aria-label="Throwback Ron's Bar Dice">
     <button id="rulesBtn" class="corner rules-btn" aria-label="Show rules" title="Rules">📜 Rules</button>
     <button id="muteBtn" class="corner mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
 
     <div class="titlebar">
-      <h1>🐗 <span class="hog">PIG</span></h1>
-      <p class="tagline">Bar Rules · Push your luck, pay in beer</p>
+      <h1>🐗 <span class="hog">THROWBACK RON'S</span><span class="big">BAR DICE</span></h1>
+      <p class="tagline">Push your luck, pay in beer</p>
     </div>
 
-    <!-- ===================== SETUP ===================== -->
-    <section id="setup" class="setup">
-      <div class="q">How many guys are in?</div>
-      <div id="countRow" class="count-row" role="group" aria-label="Number of players"></div>
-
-      <div id="names" class="names"></div>
+    <!-- ===================== HOME ===================== -->
+    <section id="home" class="home">
+      <div class="q">How do you want to play?</div>
+      <div class="stack">
+        <button id="btnLocal" class="btn btn-start">📱 Play on This Phone</button>
+        <button id="btnOnline" class="btn btn-online">🌐 Play Online</button>
+      </div>
+      <p class="hint">On this phone = pass it around the table. Online = everyone on their own phone, anywhere, with a room code.</p>
 
       <div class="legend">
         <h3>The Rules</h3>
@@ -451,11 +513,60 @@
           <li><span class="tag">Hold</span><span class="body">Bank your total. <b>First to 100 wins.</b></span></li>
         </ul>
       </div>
-
-      <button id="startBtn" class="btn btn-start">Start the Game</button>
     </section>
 
-    <!-- ===================== GAME ===================== -->
+    <!-- ===================== SETUP (pass-and-play) ===================== -->
+    <section id="setup" class="setup" style="display:none">
+      <div class="q">How many guys are in?</div>
+      <div id="countRow" class="count-row" role="group" aria-label="Number of players"></div>
+
+      <div id="names" class="names"></div>
+
+      <button id="startBtn" class="btn btn-start">Start the Game</button>
+      <div class="footer-row"><button id="setupBack" class="ghost">← Back</button></div>
+    </section>
+
+    <!-- ===================== ONLINE (name + new/join) ===================== -->
+    <section id="online" class="online" style="display:none">
+      <div class="q">Your name</div>
+      <div class="names">
+        <div class="name-field">
+          <span class="dot"></span>
+          <input id="onlineName" type="text" maxlength="14" placeholder="Your name" aria-label="Your name" />
+        </div>
+      </div>
+      <div id="onlineErr" class="err" aria-live="polite"></div>
+
+      <div class="stack">
+        <button id="btnNewGame" class="btn btn-start">➕ New Game</button>
+        <button id="btnJoinToggle" class="btn btn-online">🔑 Join a Game</button>
+      </div>
+
+      <div id="joinBox" style="display:none; margin-top: 6px;">
+        <div class="q">Enter the 4-letter room code</div>
+        <input id="joinCode" class="code-input" maxlength="4" placeholder="CODE" aria-label="Room code" autocomplete="off" autocapitalize="characters" />
+        <div style="max-width:320px; margin: 12px auto 0;">
+          <button id="btnJoinGo" class="btn btn-start" style="width:100%;">Join Room</button>
+        </div>
+      </div>
+
+      <div class="footer-row"><button id="onlineBack" class="ghost">← Back</button></div>
+    </section>
+
+    <!-- ===================== LOBBY ===================== -->
+    <section id="lobby" class="lobby" style="display:none">
+      <div class="q">Room code — share it with the guys</div>
+      <div id="lobbyCode" class="code-display">----</div>
+
+      <div class="q">In the room</div>
+      <div id="lobbyRoster" class="lobby-roster"></div>
+
+      <button id="btnStart" class="btn btn-start" style="max-width:420px; margin: 4px auto 0;">🎲 Start Game</button>
+      <p class="hint">Anyone can start once everyone's in. New players can still hop in.</p>
+      <div class="footer-row"><button id="lobbyLeave" class="ghost">← Leave Room</button></div>
+    </section>
+
+    <!-- ===================== GAME (pass-and-play board) ===================== -->
     <section id="game" class="game">
       <div id="rail" class="rail" aria-label="Players and scores"></div>
 
@@ -495,6 +606,23 @@
         <button id="newGameBtn" class="ghost">↻ New Game</button>
       </div>
     </section>
+
+    <!-- ===================== GAME ONLINE (Phase 1 holding board) ===================== -->
+    <section id="gameOnline" class="game" aria-label="Online game">
+      <div id="railOnline" class="rail" aria-label="Players and scores"></div>
+
+      <div class="die-stage">
+        <div class="die" aria-label="Die showing 5" role="img">
+          <span class="pip p1"></span><span class="pip p3"></span><span class="pip p5"></span>
+          <span class="pip p7"></span><span class="pip p9"></span>
+        </div>
+      </div>
+
+      <div id="onlineMsg" class="message" aria-live="polite">Game on!</div>
+      <p class="hint">Live turn-by-turn play arrives in the next update. For now, everyone's synced in the same room.</p>
+
+      <div class="footer-row"><button id="onlineLeave" class="ghost">← Leave Room</button></div>
+    </section>
   </main>
 
   <!-- Rules modal -->
@@ -526,18 +654,51 @@
     </div>
   </div>
 
-<script>
+<script type="module">
 "use strict";
 
 /* ============================================================
-   1) CONSTANTS & STATE
+   FIREBASE (v10 modular, via CDN)
+   Web config is PUBLIC by design — safe in the repo.
+   Protection lives in the database security rules.
+   ============================================================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get, set, update, onValue, onDisconnect }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAaTjy0ll9wIZYQFz8P_lG2gKXNokG-tVQ",
+  authDomain: "throwback-ron.firebaseapp.com",
+  databaseURL: "https://throwback-ron-default-rtdb.firebaseio.com",
+  projectId: "throwback-ron",
+  storageBucket: "throwback-ron.firebasestorage.app",
+  messagingSenderId: "962130484417",
+  appId: "1:962130484417:web:5f9be6107ffbd08eca4840"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db    = getDatabase(fbApp);
+const auth  = getAuth(fbApp);
+
+let myUid = null;
+function whenSignedIn() {
+  return new Promise((resolve, reject) => {
+    onAuthStateChanged(auth, (user) => { if (user) { myUid = user.uid; resolve(user.uid); } });
+    signInAnonymously(auth).catch(reject);
+  });
+}
+
+/* ============================================================
+   1) CONSTANTS & STATE (pass-and-play)
    ============================================================ */
 const WIN_SCORE = 100;
 const SHOT_AT   = 24;
 const BEER_AT   = 48;
 
 const state = {
-  phase: "setup",          // "setup" | "play"
+  phase: "home",           // "home" | "setup" | "play"
   count: 2,
   players: [],             // [{ name, score }]
   cur: 0,                  // index of current player
@@ -552,29 +713,62 @@ const state = {
    2) DOM REFERENCES
    ============================================================ */
 const el = {
+  // screens
+  home:       document.getElementById("home"),
   setup:      document.getElementById("setup"),
+  online:     document.getElementById("online"),
+  lobby:      document.getElementById("lobby"),
   game:       document.getElementById("game"),
+  gameOnline: document.getElementById("gameOnline"),
+
+  // home
+  btnLocal:   document.getElementById("btnLocal"),
+  btnOnline:  document.getElementById("btnOnline"),
+
+  // setup
   countRow:   document.getElementById("countRow"),
   names:      document.getElementById("names"),
   startBtn:   document.getElementById("startBtn"),
+  setupBack:  document.getElementById("setupBack"),
 
+  // online
+  onlineName:   document.getElementById("onlineName"),
+  onlineErr:    document.getElementById("onlineErr"),
+  btnNewGame:   document.getElementById("btnNewGame"),
+  btnJoinToggle:document.getElementById("btnJoinToggle"),
+  joinBox:      document.getElementById("joinBox"),
+  joinCode:     document.getElementById("joinCode"),
+  btnJoinGo:    document.getElementById("btnJoinGo"),
+  onlineBack:   document.getElementById("onlineBack"),
+
+  // lobby
+  lobbyCode:   document.getElementById("lobbyCode"),
+  lobbyRoster: document.getElementById("lobbyRoster"),
+  btnStart:    document.getElementById("btnStart"),
+  lobbyLeave:  document.getElementById("lobbyLeave"),
+
+  // game (local)
   rail:       document.getElementById("rail"),
   die:        document.getElementById("die"),
   tabVal:     document.getElementById("tabVal"),
   gauge:      document.getElementById("gauge"),
   gaugeFill:  document.getElementById("gaugeFill"),
   message:    document.getElementById("message"),
-
   rollBtn:    document.getElementById("rollBtn"),
   goBtn:      document.getElementById("goBtn"),
   holdBtn:    document.getElementById("holdBtn"),
   newGameBtn: document.getElementById("newGameBtn"),
 
+  // game online (holding)
+  railOnline: document.getElementById("railOnline"),
+  onlineMsg:  document.getElementById("onlineMsg"),
+  onlineLeave:document.getElementById("onlineLeave"),
+
+  // shared
   rulesBtn:   document.getElementById("rulesBtn"),
   rulesBtn2:  document.getElementById("rulesBtn2"),
   rulesOverlay: document.getElementById("rulesOverlay"),
   rulesClose: document.getElementById("rulesClose"),
-
   muteBtn:    document.getElementById("muteBtn"),
 
   winOverlay: document.getElementById("winOverlay"),
@@ -583,6 +777,16 @@ const el = {
   playAgainBtn: document.getElementById("playAgainBtn"),
   winNewBtn:  document.getElementById("winNewBtn")
 };
+
+/* screen switcher */
+const SCREENS = ["home", "setup", "online", "lobby", "game", "gameOnline"];
+function show(id) {
+  SCREENS.forEach(s => {
+    const node = el[s];
+    if (!node) return;
+    node.style.display = (s === id) ? "block" : "none";
+  });
+}
 
 /* ============================================================
    3) SOUND  (Web Audio, no files)
@@ -620,7 +824,8 @@ const sfx = {
   commit() { tone(220, 0.16, "sawtooth", 0.05); tone(330, 0.2, "sawtooth", 0.05, 0.1); },
   beerWin() { [392, 523, 659, 880].forEach((f, i) => tone(f, 0.2, "triangle", 0.07, i * 0.1)); },
   beerFail() { tone(200, 0.25, "sawtooth", 0.06); tone(120, 0.45, "sawtooth", 0.06, 0.14); },
-  win()  { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.26, "triangle", 0.07, i * 0.11)); }
+  win()  { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.26, "triangle", 0.07, i * 0.11)); },
+  join() { tone(523, 0.08, "triangle", 0.05); tone(784, 0.12, "triangle", 0.05, 0.07); }
 };
 
 /* ============================================================
@@ -666,9 +871,13 @@ function curP()   { return state.players[state.cur]; }
 function nextIdx(){ return (state.cur + 1) % state.players.length; }
 function nextP()  { return state.players[nextIdx()]; }
 function setMessage(html) { el.message.innerHTML = html; }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
 
 /* ============================================================
-   6) SETUP SCREEN
+   6) SETUP SCREEN (pass-and-play)
    ============================================================ */
 function buildCountRow() {
   el.countRow.innerHTML = "";
@@ -715,16 +924,15 @@ function startGame() {
   state.shotFired = false;
   state.going48 = false;
 
-  el.setup.style.display = "none";
-  el.game.classList.add("show");
+  show("game");
   drawDie(1);
   buildRail();
   render();
-  setMessage("<b>" + curP().name + "</b>, you're up — roll the die!");
+  setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
 }
 
 /* ============================================================
-   7) RENDER
+   7) RENDER (pass-and-play)
    ============================================================ */
 function buildRail() {
   el.rail.innerHTML = "";
@@ -739,32 +947,26 @@ function buildRail() {
   });
 }
 function render() {
-  // scores + active highlight
   el.rail.querySelectorAll(".chip").forEach(c => {
     const i = +c.dataset.idx;
     c.querySelector(".sc").textContent = state.players[i].score;
     c.classList.toggle("active", i === state.cur && !state.over);
   });
 
-  // tab gauge
   el.tabVal.textContent = state.turnTotal;
   const pct = Math.min(state.turnTotal, BEER_AT) / BEER_AT * 100;
   el.gaugeFill.style.width = pct + "%";
   el.gauge.classList.toggle("hot", state.going48);
 
-  // controls
   const canAct = state.phase === "play" && !state.busy && !state.over;
-  // can't roll normally once you've hit 24 unless you've committed to 48
   el.rollBtn.disabled = !canAct || (state.shotFired && !state.going48);
-  // can't hold once committed to 48; can't hold a 0
   el.holdBtn.disabled = !canAct || state.turnTotal === 0 || state.going48;
-  // go-for-48 button appears only at the 24 decision point
   el.goBtn.classList.toggle("show", state.shotFired && !state.going48 && !state.over);
   el.goBtn.disabled = !canAct;
 }
 
 /* ============================================================
-   8) TURN ENGINE  (pass-and-play, all human)
+   8) TURN ENGINE (pass-and-play)
    ============================================================ */
 function passTurn() {
   state.turnTotal = 0;
@@ -773,25 +975,24 @@ function passTurn() {
   state.cur = nextIdx();
   state.busy = false;
   render();
-  setMessage("<b>" + curP().name + "</b>, you're up — roll the die!");
+  setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
 }
 
 async function doRoll() {
   if (state.busy || state.over || state.phase !== "play") return;
-  if (state.shotFired && !state.going48) return; // must bank or commit at 24
+  if (state.shotFired && !state.going48) return;
   state.busy = true;
   render();
 
   const value = rollDie();
   await animateRoll(value);
 
-  /* ---- BUST: rolled a 1 ---- */
   if (value === 1) {
     if (state.going48) {
-      setMessage("💀 <b>" + curP().name + "</b> busted going for 48 — CHUG A FULL BEER 🍺 and lose it all!");
+      setMessage("💀 <b>" + escapeHtml(curP().name) + "</b> busted going for 48 — CHUG A FULL BEER 🍺 and lose it all!");
       sfx.beerFail();
     } else {
-      setMessage("Rolled a 1 — <b>" + curP().name + "</b>, take a drink 🍺. Turn lost.");
+      setMessage("Rolled a 1 — <b>" + escapeHtml(curP().name) + "</b>, take a drink 🍺. Turn lost.");
       sfx.bust();
     }
     state.turnTotal = 0;
@@ -801,14 +1002,12 @@ async function doRoll() {
     return;
   }
 
-  /* ---- Normal roll ---- */
   state.turnTotal += value;
-  let line = "<b>" + curP().name + "</b> rolled a " + value + ".";
-  if (value === 6) { line += " " + nextP().name + " drinks! 🍺"; sfx.six(); }
+  let line = "<b>" + escapeHtml(curP().name) + "</b> rolled a " + value + ".";
+  if (value === 6) { line += " " + escapeHtml(nextP().name) + " drinks! 🍺"; sfx.six(); }
 
-  // crossed the 48 finish line (only possible while committed)
   if (state.going48 && state.turnTotal >= BEER_AT) {
-    setMessage("🍺🔥 <b>" + state.turnTotal + "!</b> " + nextP().name + " CHUGS A FULL BEER — " + curP().name + " banks " + state.turnTotal + "!");
+    setMessage("🍺🔥 <b>" + state.turnTotal + "!</b> " + escapeHtml(nextP().name) + " CHUGS A FULL BEER — " + escapeHtml(curP().name) + " banks " + state.turnTotal + "!");
     sfx.beerWin();
     curP().score += state.turnTotal;
     render();
@@ -818,10 +1017,9 @@ async function doRoll() {
     return;
   }
 
-  // crossed the 24 shot line (fires once)
   if (!state.shotFired && state.turnTotal >= SHOT_AT) {
     state.shotFired = true;
-    line += " 🥃 <b>" + state.turnTotal + "</b> — " + nextP().name + " takes a SHOT! Bank it, or go for 48?";
+    line += " 🥃 <b>" + state.turnTotal + "</b> — " + escapeHtml(nextP().name) + " takes a SHOT! Bank it, or go for 48?";
     sfx.shot();
   }
 
@@ -836,7 +1034,7 @@ function doHold() {
   state.busy = true;
   curP().score += state.turnTotal;
   sfx.bank();
-  setMessage("<b>" + curP().name + "</b> banks " + state.turnTotal + ".");
+  setMessage("<b>" + escapeHtml(curP().name) + "</b> banks " + state.turnTotal + ".");
   render();
   if (curP().score >= WIN_SCORE) { state.busy = false; return endGame(state.cur); }
   setTimeout(() => { passTurn(); }, 950);
@@ -847,12 +1045,12 @@ function doGo48() {
   if (!state.shotFired || state.going48 || state.turnTotal < SHOT_AT) return;
   state.going48 = true;
   sfx.commit();
-  setMessage("🔥 <b>" + curP().name + "</b> is GOING FOR 48 — no holding now. Reach 48 or chug a beer!");
+  setMessage("🔥 <b>" + escapeHtml(curP().name) + "</b> is GOING FOR 48 — no holding now. Reach 48 or chug a beer!");
   render();
 }
 
 /* ============================================================
-   9) WIN / RESET
+   9) WIN / RESET (pass-and-play)
    ============================================================ */
 function endGame(winnerIdx) {
   state.over = true;
@@ -860,7 +1058,7 @@ function endGame(winnerIdx) {
   sfx.win();
   el.winName.textContent = state.players[winnerIdx].name;
   el.winSub.textContent = "First to " + WIN_SCORE + ". Everybody else — drink up.";
-  setMessage("🏆 <b>" + state.players[winnerIdx].name + "</b> wins!");
+  setMessage("🏆 <b>" + escapeHtml(state.players[winnerIdx].name) + "</b> wins!");
   showWin();
 }
 function showWin() {
@@ -895,16 +1093,14 @@ function playAgainSamePlayers() {
   el.winOverlay.classList.remove("show");
   drawDie(1);
   render();
-  setMessage("<b>" + curP().name + "</b>, you're up — roll the die!");
+  setMessage("<b>" + escapeHtml(curP().name) + "</b>, you're up — roll the die!");
 }
-function backToSetup() {
+function backToHome() {
   clearConfetti(el.winOverlay);
   el.winOverlay.classList.remove("show");
-  state.phase = "setup";
+  state.phase = "home";
   state.over = false;
-  el.game.classList.remove("show");
-  el.setup.style.display = "block";
-  buildNameFields();
+  show("home");
 }
 
 /* ============================================================
@@ -914,21 +1110,245 @@ function openRules() { el.rulesOverlay.classList.add("show"); el.rulesClose.focu
 function closeRules() { el.rulesOverlay.classList.remove("show"); }
 
 /* ============================================================
-   11) EVENT WIRING
+   11) ONLINE / LOBBY (Firebase-backed)
    ============================================================ */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1
+const NAME_KEY = "ron_name";
+
+let roomCode = null;
+let roomUnsub = null;
+let roomData = null;
+
+function genCode() {
+  let c = "";
+  for (let i = 0; i < 4; i++) c += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return c;
+}
+function getName() {
+  return (el.onlineName.value || "").trim();
+}
+function rememberName(n) {
+  try { localStorage.setItem(NAME_KEY, n); } catch (e) {}
+}
+function loadName() {
+  try { return localStorage.getItem(NAME_KEY) || ""; } catch (e) { return ""; }
+}
+
+async function goOnline() {
+  ensureAudio();
+  el.onlineErr.textContent = "";
+  el.onlineName.value = loadName();
+  el.joinBox.style.display = "none";
+  show("online");
+  try { await whenSignedIn(); }
+  catch (e) { el.onlineErr.textContent = "Couldn't connect. Check your internet and try again."; }
+}
+
+async function createRoom(name) {
+  let code;
+  while (true) {
+    code = genCode();
+    const snap = await get(ref(db, "rooms/" + code));
+    if (!snap.exists()) break;
+  }
+  await set(ref(db, "rooms/" + code), {
+    createdAt: Date.now(),
+    hostUid: myUid,
+    status: "lobby",
+    winScore: WIN_SCORE,
+    turnOrder: [myUid],
+    currentIdx: 0,
+    turnTotal: 0,
+    shotFired: false,
+    going48: false,
+    lastDie: 1,
+    winner: null,
+    lastEvent: { seq: 0, type: "start", by: myUid, value: 0, ts: Date.now() },
+    players: { [myUid]: { name, score: 0, joinedAt: Date.now(), connected: true } }
+  });
+  wireConnected(code);
+  return code;
+}
+
+async function joinRoom(code, name) {
+  code = (code || "").toUpperCase().trim();
+  if (code.length !== 4) throw new Error("Enter the 4-letter code.");
+  const roomRef = ref(db, "rooms/" + code);
+  const snap = await get(roomRef);
+  if (!snap.exists()) throw new Error("No room with code " + code + ".");
+  const room = snap.val();
+  const order = Array.isArray(room.turnOrder) ? room.turnOrder.slice() : [];
+  if (!order.includes(myUid)) order.push(myUid);
+  await update(roomRef, { turnOrder: order });
+  await set(ref(db, "rooms/" + code + "/players/" + myUid),
+    { name, score: 0, joinedAt: Date.now(), connected: true });
+  wireConnected(code);
+  return code;
+}
+
+function wireConnected(code) {
+  const cRef = ref(db, "rooms/" + code + "/players/" + myUid + "/connected");
+  set(cRef, true);
+  onDisconnect(cRef).set(false);
+}
+
+function subscribeRoom(code) {
+  roomCode = code;
+  if (roomUnsub) { roomUnsub(); roomUnsub = null; }
+  roomUnsub = onValue(ref(db, "rooms/" + code), (snap) => {
+    if (!snap.exists()) { leaveCleanup(); show("home"); return; }
+    roomData = snap.val();
+    renderRoom(roomData);
+  });
+}
+
+function orderedPlayers(room) {
+  const players = room.players || {};
+  const order = Array.isArray(room.turnOrder) ? room.turnOrder : [];
+  const seen = {};
+  const list = [];
+  order.forEach(uid => { if (players[uid]) { list.push({ uid, ...players[uid] }); seen[uid] = true; } });
+  Object.keys(players).forEach(uid => { if (!seen[uid]) list.push({ uid, ...players[uid] }); });
+  return list;
+}
+
+function renderRoom(room) {
+  // if I've been removed from the room, bail home
+  if (!room.players || !room.players[myUid]) { leaveCleanup(); show("home"); return; }
+
+  el.lobbyCode.textContent = roomCode;
+  const list = orderedPlayers(room);
+
+  if (room.status === "lobby") {
+    el.lobbyRoster.innerHTML = "";
+    list.forEach(p => {
+      const row = document.createElement("div");
+      row.className = "roster-row" + (p.uid === myUid ? " me" : "") + (p.connected ? "" : " off");
+      const isHost = p.uid === room.hostUid;
+      row.innerHTML =
+        '<span class="rdot"></span>' +
+        '<span class="who">' + escapeHtml(p.name || "Player") + (p.uid === myUid ? " (you)" : "") + '</span>' +
+        (isHost ? '<span class="badge">Host</span>' : '');
+      el.lobbyRoster.appendChild(row);
+    });
+    show("lobby");
+  } else {
+    // status "playing" (Phase 1 holding board) — everyone flips together
+    el.railOnline.innerHTML = "";
+    list.forEach(p => {
+      const c = document.createElement("div");
+      c.className = "chip";
+      c.innerHTML = '<div class="nm"></div><div class="sc"></div>';
+      c.querySelector(".nm").textContent = p.name || "Player";
+      c.querySelector(".sc").textContent = p.score || 0;
+      el.railOnline.appendChild(c);
+    });
+    const first = list[room.currentIdx] || list[0];
+    const firstName = first ? (first.uid === myUid ? "You go" : escapeHtml(first.name) + " goes") : "Someone goes";
+    el.onlineMsg.innerHTML = "🎲 <b>Game on!</b> " + firstName + " first.";
+    show("gameOnline");
+  }
+}
+
+async function startOnlineGame() {
+  if (!roomCode) return;
+  try { await update(ref(db, "rooms/" + roomCode), { status: "playing" }); }
+  catch (e) { /* rules or network */ }
+}
+
+async function leaveRoom() {
+  if (roomCode && myUid && roomData) {
+    try {
+      const order = (Array.isArray(roomData.turnOrder) ? roomData.turnOrder : []).filter(u => u !== myUid);
+      await update(ref(db, "rooms/" + roomCode), { turnOrder: order, ["players/" + myUid]: null });
+    } catch (e) {}
+  }
+  leaveCleanup();
+  show("home");
+}
+function leaveCleanup() {
+  if (roomUnsub) { roomUnsub(); roomUnsub = null; }
+  roomCode = null;
+  roomData = null;
+}
+
+/* ============================================================
+   12) EVENT WIRING
+   ============================================================ */
+// Home
+el.btnLocal.addEventListener("click", () => { ensureAudio(); state.phase = "setup"; show("setup"); });
+el.btnOnline.addEventListener("click", goOnline);
+
+// Setup (pass-and-play)
 el.startBtn.addEventListener("click", () => { ensureAudio(); startGame(); });
+el.setupBack.addEventListener("click", backToHome);
+
+// Online name + new/join
+el.btnNewGame.addEventListener("click", async () => {
+  const name = getName();
+  if (!name) { el.onlineErr.textContent = "Enter your name first."; el.onlineName.focus(); return; }
+  el.onlineErr.textContent = "";
+  el.btnNewGame.disabled = true;
+  try {
+    await whenSignedIn();
+    rememberName(name);
+    const code = await createRoom(name);
+    sfx.join();
+    subscribeRoom(code);
+  } catch (e) {
+    el.onlineErr.textContent = "Couldn't create the room. Try again.";
+  } finally {
+    el.btnNewGame.disabled = false;
+  }
+});
+el.btnJoinToggle.addEventListener("click", () => {
+  const open = el.joinBox.style.display !== "none";
+  el.joinBox.style.display = open ? "none" : "block";
+  if (!open) el.joinCode.focus();
+});
+el.joinCode.addEventListener("input", () => {
+  el.joinCode.value = el.joinCode.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+});
+el.btnJoinGo.addEventListener("click", async () => {
+  const name = getName();
+  if (!name) { el.onlineErr.textContent = "Enter your name first."; el.onlineName.focus(); return; }
+  const code = el.joinCode.value.trim();
+  if (code.length !== 4) { el.onlineErr.textContent = "Enter the 4-letter code."; el.joinCode.focus(); return; }
+  el.onlineErr.textContent = "";
+  el.btnJoinGo.disabled = true;
+  try {
+    await whenSignedIn();
+    rememberName(name);
+    const joined = await joinRoom(code, name);
+    sfx.join();
+    subscribeRoom(joined);
+  } catch (e) {
+    el.onlineErr.textContent = e.message || "Couldn't join. Check the code.";
+  } finally {
+    el.btnJoinGo.disabled = false;
+  }
+});
+el.onlineBack.addEventListener("click", () => show("home"));
+
+// Lobby
+el.btnStart.addEventListener("click", startOnlineGame);
+el.lobbyLeave.addEventListener("click", leaveRoom);
+el.onlineLeave.addEventListener("click", leaveRoom);
+
+// Game (local)
 el.rollBtn.addEventListener("click", doRoll);
 el.holdBtn.addEventListener("click", doHold);
 el.goBtn.addEventListener("click", doGo48);
-el.newGameBtn.addEventListener("click", backToSetup);
+el.newGameBtn.addEventListener("click", backToHome);
 
+// Rules + mute
 el.rulesBtn.addEventListener("click", openRules);
 el.rulesBtn2.addEventListener("click", openRules);
 el.rulesClose.addEventListener("click", closeRules);
 el.rulesOverlay.addEventListener("click", (e) => { if (e.target === el.rulesOverlay) closeRules(); });
 
 el.playAgainBtn.addEventListener("click", playAgainSamePlayers);
-el.winNewBtn.addEventListener("click", backToSetup);
+el.winNewBtn.addEventListener("click", backToHome);
 
 el.muteBtn.addEventListener("click", () => {
   soundOn = !soundOn;
@@ -947,11 +1367,12 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* ============================================================
-   12) BOOT
+   13) BOOT
    ============================================================ */
 buildCountRow();
 buildNameFields();
 drawDie(1);
+show("home");
 </script>
 </body>
 </html>
