@@ -1374,7 +1374,7 @@ function showWin() {
   el.winOverlay.classList.add("show");
   launchConfetti(el.winOverlay);
   charMountScreen("win");
-  playVoice("win");
+  setTimeout(() => { _voiceAt = 0; playVoice("win"); }, 350);
   el.playAgainBtn.focus();
 }
 function launchConfetti(container) {
@@ -1676,7 +1676,7 @@ function renderOnlineGame(room) {
       el.winOverlay.classList.add("show");
       launchConfetti(el.winOverlay);
       charMountScreen("win");
-      playVoice("win");
+      setTimeout(() => { _voiceAt = 0; playVoice("win"); }, 350);
     }
     show("gameOnline");
     return;
