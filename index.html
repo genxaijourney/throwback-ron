@@ -1994,18 +1994,15 @@ function playVoice(kind) {
   const pr = a.play(); if (pr && pr.catch) pr.catch(() => {});
 }
 AUDIO.intro = AUDIO.win;
-let _introArmed = false;
+let _audioUnlocked = false;
+function unlockAudio() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  if (_lastScreen === "home" && soundOn) playVoice("intro");
+}
 function armIntro() {
-  if (_introArmed) return; _introArmed = true;
-  const fire = () => {
-    if (_lastScreen === "home" && soundOn) playVoice("intro");
-    window.removeEventListener("pointerdown", fire, true);
-    window.removeEventListener("touchstart", fire, true);
-    window.removeEventListener("keydown", fire, true);
-  };
-  window.addEventListener("pointerdown", fire, true);
-  window.addEventListener("touchstart", fire, true);
-  window.addEventListener("keydown", fire, true);
+  ["click", "touchend", "pointerdown", "keydown"].forEach(ev =>
+    window.addEventListener(ev, unlockAudio, { capture: true, passive: true }));
 }
 function react(kind) {
   switch (kind) {
@@ -2036,6 +2033,7 @@ function screenChanged(id) {
   if (id === _lastScreen) return;
   _lastScreen = id;
   if (id === "home" || id === "game" || id === "gameOnline") charMountScreen(id);
+  if (id === "home" && _audioUnlocked && soundOn) playVoice("intro");
 }
 function layoutRoll(row, holder, bubble, activeChip) {
   if (!row || !holder) return;
