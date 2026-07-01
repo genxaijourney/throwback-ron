@@ -1395,7 +1395,10 @@ function renderOnlineGame(room) {
 
   onlineOverShown = false;
   const myTurn = curUid === myUid;
-  const canAct = myTurn && room.status === "playing" && !onlineBusy;
+  // NOTE: do NOT gate on onlineBusy here — Firebase fires this render during the
+  // optimistic write while onlineBusy is still true, which would wrongly leave the
+  // buttons disabled. Double-clicks are guarded inside the action handlers instead.
+  const canAct = myTurn && room.status === "playing";
   el.rollBtnO.disabled = !canAct || (room.shotFired && !room.going48);
   el.holdBtnO.disabled = !canAct || (room.turnTotal || 0) === 0 || room.going48;
   el.goBtnO.classList.toggle("show", room.status === "playing" && room.shotFired && !room.going48 && myTurn);
