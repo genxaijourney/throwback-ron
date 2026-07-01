@@ -649,6 +649,7 @@
   .home-stage .stage-rules{bottom:26px;}
   .rules-btn{display:none !important;}
   @media(max-width:520px){ .stage-rules{width:38px;height:38px;bottom:26px;font-size:.95rem;} }
+  .splash{text-align:center;}
 </style>
 </head>
 <body>
@@ -662,6 +663,16 @@
     </div>
 
     <!-- ===================== HOME ===================== -->
+    <section id="splash" class="splash">
+      <div class="home-stage"><canvas class="char" id="charSplash" width="320" height="180" aria-hidden="true"></canvas><div class="counter"></div></div>
+      <div class="q">Pull up a stool — sound on?</div>
+      <div class="stack">
+        <button id="btnSoundOn" class="btn btn-start">🔊 Sound On</button>
+        <button id="btnSoundOff" class="btn btn-online">🔇 No Sound</button>
+      </div>
+      <p class="hint">Ron's got a laugh and some choice words. 🔊 recommended — flip it anytime with the 🔊 on his stage.</p>
+    </section>
+
     <section id="home" class="home">
       <div class="home-stage"><canvas class="char" id="charHome" width="320" height="180" aria-hidden="true"></canvas><button class="stage-rules" aria-label="Rules">📜</button><button class="stage-mute" aria-label="Toggle sound">🔊</button><div class="counter"></div></div>
       <div class="q">How do you want to play?</div>
@@ -926,6 +937,9 @@ const state = {
    ============================================================ */
 const el = {
   // screens
+  splash:     document.getElementById("splash"),
+  btnSoundOn: document.getElementById("btnSoundOn"),
+  btnSoundOff:document.getElementById("btnSoundOff"),
   home:       document.getElementById("home"),
   setup:      document.getElementById("setup"),
   online:     document.getElementById("online"),
@@ -1000,7 +1014,7 @@ const el = {
 };
 
 /* screen switcher */
-const SCREENS = ["home", "setup", "online", "lobby", "game", "gameOnline"];
+const SCREENS = ["splash", "home", "setup", "online", "lobby", "game", "gameOnline"];
 function show(id) {
   SCREENS.forEach(s => {
     const node = el[s];
@@ -1769,6 +1783,15 @@ function leaveCleanup() {
    12) EVENT WIRING
    ============================================================ */
 // Home
+el.btnSoundOn.addEventListener("click", () => {
+  soundOn = true; _audioUnlocked = true; ensureAudio(); updateSoundUI();
+  playVoice("intro");
+  show("home");
+});
+el.btnSoundOff.addEventListener("click", () => {
+  soundOn = false; _audioUnlocked = true; updateSoundUI();
+  show("home");
+});
 el.btnLocal.addEventListener("click", () => { ensureAudio(); state.phase = "setup"; show("setup"); });
 el.btnOnline.addEventListener("click", goOnline);
 
@@ -2042,7 +2065,8 @@ function reactOnline(t) {
   else if (t === "bank") react("bank");
 }
 function charMountScreen(which) {
-  if (which === "home")            Char.mount(document.getElementById("charHome"), "ronIdle", null);
+  if (which === "splash")          Char.mount(document.getElementById("charSplash"), "ronIdle", null);
+  else if (which === "home")       Char.mount(document.getElementById("charHome"), "ronIdle", null);
   else if (which === "game")       Char.mount(document.getElementById("charGame"), "idle", document.getElementById("bubbleGame"));
   else if (which === "gameOnline") Char.mount(document.getElementById("charOnline"), "idle", document.getElementById("bubbleOnline"));
   else if (which === "win")        Char.mount(document.getElementById("charWin"), "ronGloat", null);
@@ -2052,8 +2076,7 @@ function screenChanged(id) {
   if (el.winOverlay && el.winOverlay.classList.contains("show")) return;
   if (id === _lastScreen) return;
   _lastScreen = id;
-  if (id === "home" || id === "game" || id === "gameOnline") charMountScreen(id);
-  if (id === "home" && _audioUnlocked && soundOn) playVoice("intro");
+  if (id === "splash" || id === "home" || id === "game" || id === "gameOnline") charMountScreen(id);
 }
 function layoutRoll(row, holder, bubble, activeChip) {
   if (!row || !holder) return;
@@ -2095,9 +2118,8 @@ window.addEventListener("resize", relayoutActive);
 buildCountRow();
 buildNameFields();
 drawDie(1);
-show("home");
 initAudio();
-armIntro();
+show("splash");
 </script>
 </body>
 </html>
