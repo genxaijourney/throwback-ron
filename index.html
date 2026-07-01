@@ -1088,7 +1088,8 @@ function animateRoll(value) {
     el.die.classList.remove("rolling", "bust");
     void el.die.offsetWidth;
     el.die.classList.add("rolling");
-    const flicker = setInterval(() => { drawDie(rollDie()); sfx.roll(); }, 90);
+    diceRoll();
+    const flicker = setInterval(() => { drawDie(rollDie()); }, 90);
     setTimeout(() => {
       clearInterval(flicker);
       el.die.classList.remove("rolling");
@@ -1539,17 +1540,49 @@ function paintDie(node, value, bust) {
 }
 
 /* ---- sound for the event everyone just received ---- */
+function diceRoll() {
+  if (!soundOn) return;
+  ensureAudio();
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const clack = (when, gain, heavy) => {
+    const dur = heavy ? 0.055 : 0.028;
+    const n = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let j = 0; j < n; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / n, 2);
+    const src = audioCtx.createBufferSource(); src.buffer = buf;
+    const bp = audioCtx.createBiquadFilter(); bp.type = "bandpass";
+    bp.frequency.value = heavy ? 520 + Math.random() * 260 : 1100 + Math.random() * 1500;
+    bp.Q.value = heavy ? 2.2 : 4.5;
+    const amp = audioCtx.createGain();
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.exponentialRampToValueAtTime(gain * (heavy ? 0.11 : 0.07), when + 0.003);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    src.connect(bp).connect(amp).connect(audioCtx.destination);
+    src.start(when); src.stop(when + dur + 0.02);
+  };
+  const impacts = 7 + Math.floor(Math.random() * 3);
+  let t = 0.0;
+  for (let i = 0; i < impacts; i++) {
+    const frac = i / impacts;
+    t += 0.025 + Math.random() * 0.045 + frac * 0.03;
+    clack(now + t, 0.55 + Math.random() * 0.5, false);
+  }
+  clack(now + t + 0.05, 1.0, true);
+}
+
 function onlineSound(type) {
   if (!soundOn) return;
   switch (type) {
-    case "roll": sfx.roll(); break;
-    case "six": sfx.six(); break;
-    case "shot": sfx.shot(); break;
-    case "bust": sfx.bust(); break;
+    case "roll": diceRoll(); break;
+    case "six": diceRoll(); sfx.six(); break;
+    case "shot": diceRoll(); sfx.shot(); break;
+    case "bust": diceRoll(); sfx.bust(); break;
     case "go48": sfx.commit(); break;
     case "bank": sfx.bank(); break;
-    case "beer_win": sfx.beerWin(); break;
-    case "beer_fail": sfx.beerFail(); break;
+    case "beer_win": diceRoll(); sfx.beerWin(); break;
+    case "beer_fail": diceRoll(); sfx.beerFail(); break;
     case "win": sfx.win(); break;
     case "start": sfx.join(); break;
   }
